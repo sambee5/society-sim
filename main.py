@@ -7,13 +7,13 @@ from sklearn.decomposition import PCA
 # --------------------
 # PARAMETERS
 # --------------------
-N = 500          # number of agents
+N = 300          # number of agents
 d = 5            # opinion dimensions
-T = 1500          # timesteps
+T = 500          # timesteps
 
 alpha = 0.5     # attraction strength
 beta = 0.1      # repulsion strength
-epsilon = 0.5    # bounded confidence
+epsilon = 0.9   # bounded confidence
 sigma = 0.01     # noise strength
 
 rho = 0.1        # protest critical mass
@@ -24,16 +24,16 @@ snapshot_every = 10  # timesteps between snapshots
 # --------------------
 np.random.seed(42)
 
-# Opinion vectors
+# Opinion vectors of all agents with d opinions each in [-1, 1]
 X = np.random.uniform(-1, 1, size=(N, d))
 
 # Individual tolerance thresholds
 tau = np.random.uniform(0.3, 0.6, size=N)
 
-# Social network
+# Social network where each agent is connected to k neighbors with rewiring probability p
 G = nx.watts_strogatz_graph(N, k=8, p=0.1)
-neighbors = [list(G.neighbors(i)) for i in range(N)]
-print(neighbors)
+neighbors = [list(G.neighbors(i)) for i in range(N)] #list of k neighbors for each agent
+ 
 # Tracking
 protest_fraction = []
 snapshots = []
@@ -42,9 +42,12 @@ protest_snapshots = []
 # --------------------
 # SIMULATION LOOP
 # --------------------
+
+protesting = np.zeros(N, dtype=bool)
+
 for t in range(T):
+    #make a temp copy of X to update opinions simultaneously
     X_new = X.copy()
-    protesting = np.zeros(N, dtype=bool)
 
     for i in range(N):
         nbrs = neighbors[i]
@@ -120,6 +123,7 @@ plt.show()
 
 
 pca = PCA(n_components=3)
+pca.fit(np.vstack(snapshots)) 
 X_2d_all = [pca.fit_transform(Xsnap) for Xsnap in snapshots]
 
 
@@ -147,10 +151,20 @@ ax.set_xlim(-3, 3)
 ax.set_ylim(-3, 3)
 
 def update(frame):
-    scat.set_offsets(X_2d_all[frame])
-    scat.set_array(protest_snapshots[frame].astype(int))
+    # Project opinions
+    X_2d = pca.transform(snapshots[frame])
+
+    # Color by first principal component (main ideological axis)
+    colors = X_2d[:, 0]
+
+    scat.set_offsets(X_2d)
+    scat.set_array(colors)
+
     ax.set_title(f"Opinion Space — t={frame * snapshot_every}")
     return scat,
+
+
+
 
 ani = animation.FuncAnimation(
     fig,
@@ -158,5 +172,9 @@ ani = animation.FuncAnimation(
     frames=len(X_2d_all),
     interval=200
 )
+
+
+
+
 
 plt.show()
